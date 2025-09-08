@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>GTIN EASY TOOL</title> <!-- ✅ Updated Title -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      max-width: 900px;
+      margin: auto;
+      background: #f4f6f9;
+      color: #333;
+    }
+    h1, h2 {
+      text-align: center;
+      color: #2c3e50;
+    }
+    form, .section {
+      background: #fff;
+      padding: 20px;
+      margin-top: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: bold;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin-top: 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+    button {
+      cursor: pointer;
+      background: #3498db;
+      color: #fff;
+      font-weight: bold;
+      transition: background 0.3s;
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    #result {
+      margin-top: 15px;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    table {
+      width: 100%;
+      margin-top: 20px;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+    th {
+      background: #3498db;
+      color: #fff;
+    }
+    tr:nth-child(even) {
+      background: #f9f9f9;
+    }
+    .btn-secondary {
+      background: #2ecc71;
+    }
+    .btn-secondary:hover {
+      background: #27ae60;
+    }
+  </style>
+</head>
+<body>
+
+<h1>GTIN EASY TOOL</h1> <!-- ✅ Updated Heading -->
+
+<form id="generateForm">
+  <label for="code_type">Code Type</label>
+  <select id="code_type" required>
+    <option value="">Select code type</option>
+    <option value="GTIN-13">GTIN-13</option>
+    <option value="GTIN-14">GTIN-14</option>
+    <option value="GMN">GMN</option>
+    <option value="UDI-DI">UDI-DI</option>
+  </select>
+
+  <label for="prefix">Prefix</label>
+  <input type="text" id="prefix" required />
+
+  <label for="sku">SKU Number</label>
+  <input type="text" id="sku" required />
+
+  <div id="indicatorContainer" style="display:none;">
+    <label for="indicator">Indicator (GTIN-14 only)</label>
+    <input type="text" id="indicator" maxlength="1" placeholder="Default: 0" />
+  </div>
+
+  <button type="submit">🚀 Generate Code</button>
+</form>
+
+<div id="result"></div>
+
+<div class="section">
+  <h2>📊 Download Reports</h2>
+  <button onclick="exportExcel()">📥 Download Full Report</button>
+  <input id="skuInput" placeholder="Enter SKU for individual report" />
+  <button class="btn-secondary" onclick="exportExcelSku()">📥 Download SKU Report</button>
+</div>
+
+<div class="section">
+  <h2>📜 History</h2>
+  <table>
+    <thead>
+      <tr><th>Type</th><th>Prefix</th><th>SKU</th><th>Indicator</th><th>Item Ref</th><th>Code</th></tr>
+    </thead>
+    <tbody id="historyBody"></tbody>
+  </table>
+</div>
+
+<script>
+const form = document.getElementById("generateForm");
+const resultDiv = document.getElementById("result");
+const historyBody = document.getElementById("historyBody");
+
+document.getElementById("code_type").addEventListener("change", function () {
+  document.getElementById("indicatorContainer").style.display = this.value === "GTIN-14" ? "block" : "none";
+});
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const code_type = document.getElementById("code_type").value;
+  const prefix = document.getElementById("prefix").value.trim();
+  const sku = document.getElementById("sku").value.trim();
+  const indicator = document.getElementById("indicator").value.trim();
+
+  const payload = { code_type, prefix, sku };
+  if (code_type === "GTIN-14" && indicator) payload.indicator = indicator;
+
+  try {
+    const res = await fetch("/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json();
+    console.log("Server response:", data);
+    if (res.ok && data.generated_code) {
+      resultDiv.style.color = "green";
+      resultDiv.textContent = `✅ Generated Code: ${data.generated_code}`;
+      loadHistory();
+    } else {
+      resultDiv.style.color = "red";
+      resultDiv.textContent = `❌ Error: ${data.error || "Unknown error"}`;
+      alert(data.error || "Unknown error"); // ✅ popup for duplicates
+    }
+  } catch (err) {
+    console.error("Fetch error:", err);
+    resultDiv.style.color = "red";
+    resultDiv.textContent = "❌ Server error.";
+  }
+});
+
+async function loadHistory() {
+  const res = await fetch("/history");
+  const data = await res.json();
+  historyBody.innerHTML = "";
+  data.history.forEach(item => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${item.code_type}</td><td>${item.prefix}</td><td>${item.sku}</td><td>${item.indicator || ''}</td><td>${item.item_reference}</td><td>${item.generated_code}</td>`;
+    historyBody.appendChild(tr);
+  });
+}
+loadHistory();
+
+function exportExcel() {
+  window.location.href = "/export-excel";
+}
+
+function exportExcelSku() {
+  const sku = document.getElementById("skuInput").value.trim();
+  if (!sku) return alert("Enter a SKU");
+  window.location.href = `/export-excel/${encodeURIComponent(sku)}`;
+}
+</script>
+
+</body>
+</html>
